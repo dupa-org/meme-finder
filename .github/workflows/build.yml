@@ -7,19 +7,8 @@ on:
     branches: ["main"]
 
 jobs:
-  ktlint:
-    name: Check Code Quality
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Clone PR
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-      - name: Run Ktlint
-        uses: lucasnlm/ktlint-action@master
-
   build:
+    name: Check Formatting and Build
     runs-on: ubuntu-latest
 
     steps:
@@ -33,5 +22,7 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+      - name: Check Code Formatting
+        run: ./gradlew ktfmtCheck
       - name: Build with Gradle
         run: ./gradlew build
