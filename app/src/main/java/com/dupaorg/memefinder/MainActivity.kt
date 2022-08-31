@@ -21,9 +21,7 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
-                ) {
-                    Greeting("Android")
-                }
+                ) { Greeting("Android") }
             }
         }
     }
@@ -37,7 +35,5 @@ fun Greeting(name: String) {
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
-    MemeFinderTheme {
-        Greeting("Android")
-    }
+    MemeFinderTheme { Greeting("Android") }
 }
