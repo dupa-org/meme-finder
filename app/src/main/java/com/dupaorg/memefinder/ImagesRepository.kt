@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.flow
 
 class ImagesRepository {
 
-    fun all(applicationContext: Context): Flow<Image> {
+    fun all(applicationContext: Context): Flow<RawImage> {
         val projection =
             arrayOf(
                 MediaStore.Images.Media._ID,
@@ -41,8 +41,7 @@ class ImagesRepository {
                         ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
 
                     emit(
-                        Image(
-                            id,
+                        RawImage(
                             name,
                             imageUri,
                             InputImage.fromFilePath(applicationContext, imageUri)

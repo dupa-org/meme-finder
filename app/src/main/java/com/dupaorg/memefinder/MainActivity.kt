@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun App(images: Flow<Image>, distance: (String, String) -> Double) {
+private fun App(images: Flow<RawImage>, distance: (String, String) -> Double) {
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     val texts = remember { mutableStateListOf<ProcessedImage>() }
     suspend fun index() {
@@ -202,7 +202,7 @@ private fun PermissionDenied(permission: String) {
     Text("Permission $permission denied")
 }
 
-data class Image(val id: Long, val name: String, val path: Uri, val data: InputImage)
+data class RawImage(val name: String, val path: Uri, val data: InputImage)
 
 data class ProcessedImage(val recognizedText: String, val path: Uri, val name: String)
 
