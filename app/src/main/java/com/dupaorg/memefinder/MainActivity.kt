@@ -1,12 +1,9 @@
 package com.dupaorg.memefinder
 
 import android.Manifest
-import android.content.ContentResolver
-import android.content.ContentUris
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -59,6 +56,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import info.debatty.java.stringsimilarity.WeightedLevenshtein
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,7 +96,9 @@ class MainActivity : ComponentActivity() {
                             if (c1 == 'R' && c2 == 'P') 0.1
                             else if (c1 == 'E' && c2 == 'F') 0.1 else 1.0
                         }
-                        App(getImages()) { s1, s2 -> wl.distance(s1, s2) }
+                        val imagesRepository = ImagesRepository()
+                        val context = LocalContext.current.applicationContext
+                        App(imagesRepository.all(context)) { s1, s2 -> wl.distance(s1, s2) }
                     }
                 }
             }
@@ -116,63 +119,18 @@ class MainActivity : ComponentActivity() {
             }
             .launch(permission)
     }
-
-    private fun getImages(): List<Image> {
-        val projection =
-            arrayOf(
-                MediaStore.Images.Media._ID,
-                MediaStore.Images.Media.DISPLAY_NAME,
-                MediaStore.Images.Media.DATA // This is the actual image file path
-            )
-
-        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
-
-        val cursor =
-            contentResolver.query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                null,
-                null,
-                sortOrder
-            )
-
-        val images = ArrayList<Image>()
-        cursor?.use {
-            val idColumn = it.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val nameColumn = it.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-
-            while (it.moveToNext()) {
-                val id = it.getLong(idColumn)
-                val name = it.getString(nameColumn)
-
-                val imageUri =
-                    ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-
-                images.add(
-                    Image(
-                        id,
-                        name,
-                        imageUri,
-                        InputImage.fromFilePath(this.applicationContext, imageUri)
-                    )
-                )
-            }
-        }
-        return images
-    }
 }
 
-
 @Composable
-private fun App(images: List<Image>, distance: (String, String) -> Double) {
+private fun App(images: Flow<Image>, distance: (String, String) -> Double) {
     val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    val texts = remember { mutableStateListOf<ImageWithText>() }
-    fun index() {
-        for (image in images) {
+    val texts = remember { mutableStateListOf<ProcessedImage>() }
+    suspend fun index() {
+        images.collect { image ->
             recognizer
                 .process(image.data)
                 .addOnSuccessListener { recognized ->
-                    texts.add(ImageWithText(image.id, image.name, image.path, recognized.text))
+                    texts.add(ProcessedImage(recognized.text, image.path, image.name))
                 }
                 .addOnFailureListener { e ->
                     when (e) {
@@ -193,7 +151,7 @@ private fun App(images: List<Image>, distance: (String, String) -> Double) {
         Spacer(modifier = Modifier.width(50.dp))
         SearchBox { searchTerm ->
             if (texts.isEmpty()) {
-                index()
+                CoroutineScope(Dispatchers.Main).launch { index() }
             } else {
                 texts.sortBy { distance(searchTerm, it.recognizedText) }
             }
@@ -202,7 +160,7 @@ private fun App(images: List<Image>, distance: (String, String) -> Double) {
 }
 
 @Composable
-fun ImageList(images: List<ImageWithText>) {
+fun ImageList(images: List<ProcessedImage>) {
     when {
         // TODO: handle this case better
         images.isEmpty() -> Text("empty list")
@@ -246,7 +204,7 @@ private fun PermissionDenied(permission: String) {
 
 data class Image(val id: Long, val name: String, val path: Uri, val data: InputImage)
 
-data class ImageWithText(val id: Long, val name: String, val path: Uri, val recognizedText: String)
+data class ProcessedImage(val recognizedText: String, val path: Uri, val name: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -290,20 +248,17 @@ private fun DefaultPreview() {
     ImageList(
         images =
             listOf(
-                ImageWithText(
-                    2137,
+                ProcessedImage(
                     "dupa",
                     Uri.parse("content://media/external/images/media/27"),
                     "dupa"
                 ),
-                ImageWithText(
-                    2137,
+                ProcessedImage(
                     "dupa",
                     Uri.parse("content://media/external/images/media/26"),
                     "dupa"
                 ),
-                ImageWithText(
-                    2137,
+                ProcessedImage(
                     "dupa",
                     Uri.parse("content://media/external/images/media/25"),
                     "dupa"
